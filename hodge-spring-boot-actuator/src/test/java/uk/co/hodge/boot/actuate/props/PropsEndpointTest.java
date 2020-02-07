@@ -4,6 +4,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.springframework.boot.actuate.env.EnvironmentEndpoint;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.test.util.TestPropertyValues;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.ConfigurableEnvironment;
@@ -11,8 +12,6 @@ import org.springframework.core.env.Environment;
 import org.springframework.core.env.MapPropertySource;
 import org.springframework.core.env.StandardEnvironment;
 import uk.co.hodge.boot.actuate.props.PropsEndpoint.PropertyEntryDescriptor;
-
-import java.util.Collections;
 
 import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -52,6 +51,27 @@ public class PropsEndpointTest {
 
         assertThat(descriptor.getProperties())
                 .containsOnly(new PropertyEntryDescriptor("my.prop1", "mypropval1", "priority"));
+    }
+
+    @Test
+    public void shouldContinueToSanitizeSensitiveKeysAsSpringCurrentlyDoes() {
+        // Given
+        TestPropertyValues.of("dbPassword=123456", "apiKey=123456", "mySecret=123456", "myCredentials=123456", "VCAP_SERVICES=123456")
+                .applyToSystemProperties(() -> {
+
+                    // When
+                    PropsEndpoint.PropertiesDescriptor descriptor = new PropsEndpoint(new StandardEnvironment()).properties(null);
+
+                    // Then
+                    assertThat(descriptor.getProperties())
+                            .contains(
+                                    new PropertyEntryDescriptor("dbPassword", "******", "systemProperties"),
+                                    new PropertyEntryDescriptor("apiKey", "******", "systemProperties"),
+                                    new PropertyEntryDescriptor("mySecret", "******", "systemProperties"),
+                                    new PropertyEntryDescriptor("myCredentials", "******", "systemProperties"),
+                                    new PropertyEntryDescriptor("VCAP_SERVICES", "******", "systemProperties"));
+            return null;
+        });
     }
 
     private static ConfigurableEnvironment emptyEnvironment() {
